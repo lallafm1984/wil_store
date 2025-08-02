@@ -15,8 +15,11 @@ interface GroupedProductData {
   sizeProducts: ProductData[];
 }
 
+interface ExcelRow {
+  [key: string]: string | number;
+}
+
 export default function Home() {
-  const [uploadedData, setUploadedData] = useState<ProductData[]>([]);
   const [groupedData, setGroupedData] = useState<GroupedProductData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,7 +31,6 @@ export default function Home() {
     try {
       const data = await readExcelFile(file);
       const aggregatedData = aggregateDataByProduct(data);
-      setUploadedData(aggregatedData);
       const grouped = groupProductsBySize(aggregatedData);
       setGroupedData(grouped);
     } catch (error) {
@@ -48,9 +50,9 @@ export default function Home() {
           const workbook = XLSX.read(data, { type: "array" });
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
           
-          const processedData = jsonData.map((row: any) => ({
+          const processedData = jsonData.map((row: ExcelRow) => ({
             상품명: String(row.상품명 || row["상품명"] || ""),
             수량: Number(row.수량 || row["수량"] || 0),
             매출금액: Number(row["매출금액 pie(배송비포함)"] || row["매출금액(배송비포함)"] || row.매출금액 || row["매출금액"] || 0),
@@ -85,9 +87,6 @@ export default function Home() {
   const groupProductsBySize = (data: ProductData[]): GroupedProductData[] => {
     const mainProducts: { [key: string]: ProductData } = {};
     const sizeProducts: { [key: string]: ProductData[] } = {};
-    
-    // 예외 상품 목록 (사이즈 상품이 없는 메인 상품들)
-    const exceptionProducts = ["쇼핑백 중", "쇼핑백 대"];
     
     data.forEach(item => {
       if (item.상품명.includes('_')) {
@@ -203,7 +202,7 @@ export default function Home() {
                 .xlsx 또는 .xls 파일만 지원됩니다
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                파일에는 "상품명", "수량", "매출금액(배송비포함)", "상품 개별 금액" 컬럼이 포함되어야 합니다
+                파일에는 &quot;상품명&quot;, &quot;수량&quot;, &quot;매출금액(배송비포함)&quot;, &quot;상품 개별 금액&quot; 컬럼이 포함되어야 합니다
               </p>
             </div>
           </div>
@@ -227,7 +226,7 @@ export default function Home() {
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
-                상품별 통계 결과 ({groupedData.length}개 상품)
+                상품별 매출 ({groupedData.length}개 상품)
               </h2>
             </div>
             <div className="overflow-x-auto">

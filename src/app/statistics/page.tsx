@@ -9,7 +9,6 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -19,7 +18,7 @@ import {
 } from 'recharts';
 
 interface ExcelData {
-  [key: string]: any;
+  [key: string]: string | number;
 }
 
 interface Statistics {
@@ -34,7 +33,6 @@ interface Statistics {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export default function StatisticsPage() {
-  const [excelData, setExcelData] = useState<ExcelData[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,7 +53,6 @@ export default function StatisticsPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelData[];
         
-        setExcelData(jsonData);
         calculateStatistics(jsonData);
       } catch (error) {
         console.error('파일 처리 중 오류가 발생했습니다:', error);
