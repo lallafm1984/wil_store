@@ -53,10 +53,10 @@ export default function Home() {
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
           
           const processedData = jsonData.map((row: ExcelRow) => ({
-            상품명: String(row.상품명 || row["상품명"] || ""),
-            수량: Number(row.수량 || row["수량"] || 0),
-            매출금액: Number(row["매출금액 pie(배송비포함)"] || row["매출금액(배송비포함)"] || row.매출금액 || row["매출금액"] || 0),
-            개별금액: Number(row["상품 개별 금액"] || row["상품개별금액"] || row.개별금액 || 0)
+            상품명: String(row["개별상품 명"] || ""),
+            수량: Number(row["개별상품 개수"] || 0),
+            매출금액: Number(row["결제금액"] || 0),
+            개별금액: Number(row["개별상품 금액"] || 0)
           })).filter(item => item.상품명 && item.상품명.trim() !== "");
           
           resolve(processedData);
@@ -169,6 +169,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
+        {/* 헤더 */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             📊 무인매장 매출 엑셀 변환
@@ -202,7 +203,7 @@ export default function Home() {
                 .xlsx 또는 .xls 파일만 지원됩니다
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                파일에는 &quot;상품명&quot;, &quot;수량&quot;, &quot;매출금액(배송비포함)&quot;, &quot;상품 개별 금액&quot; 컬럼이 포함되어야 합니다
+                매출현황 -{'>'}  매출내역 -{'>'} 엑셀다운로드(정산자료)의 파일을 업로드 해주세요.
               </p>
             </div>
           </div>
