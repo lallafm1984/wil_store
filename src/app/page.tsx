@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 
 interface ProductData {
@@ -22,6 +22,7 @@ interface ExcelRow {
 export default function Home() {
   const [groupedData, setGroupedData] = useState<GroupedProductData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [productRefsByName, setProductRefsByName] = useState<Record<string, { 품번?: string; 품목코드?: string }>>({});
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -39,6 +40,38 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    const loadProductRefs = async () => {
+      try {
+        const res = await fetch('/참조상품.csv');
+        if (!res.ok) return;
+        const text = await res.text();
+        const map = parseProductCsv(text);
+        setProductRefsByName(map);
+      } catch (e) {
+        console.error('참조상품 CSV 로드 실패', e);
+      }
+    };
+    loadProductRefs();
+  }, []);
+
+  const parseProductCsv = (text: string): Record<string, { 품번?: string; 품목코드?: string }> => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    const map: Record<string, { 품번?: string; 품목코드?: string }> = {};
+    // Expect header: 상품명,품번,품목코드
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      const parts = line.split(',');
+      if (parts.length < 3) continue;
+      const name = (parts[0] ?? '').trim();
+      const code = (parts[1] ?? '').trim();
+      const itemCode = (parts[2] ?? '').trim();
+      if (!name) continue;
+      map[name] = { 품번: code || undefined, 품목코드: itemCode || undefined };
+    }
+    return map;
   };
 
   const readExcelFile = (file: File): Promise<ProductData[]> => {
@@ -241,6 +274,12 @@ export default function Home() {
                       상품명
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     품목코드
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                     품번
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       총 수량
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -259,7 +298,15 @@ export default function Home() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                           {group.mainProduct.상품명}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {productRefsByName[group.mainProduct.상품명]?.품목코드 ?? '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {productRefsByName[group.mainProduct.상품명]?.품번 ?? '-'}
+                        </td>
+                       
+                        
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
                           {group.mainProduct.수량.toLocaleString()}개
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
@@ -273,6 +320,12 @@ export default function Home() {
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600 pl-8">
                             - {sizeProduct.상품명}
+                          </td>
+                          <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
+                          {productRefsByName[sizeProduct.상품명]?.품목코드 ?? '-'}
+                          </td>
+                          <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
+                          {productRefsByName[sizeProduct.상품명]?.품번 ?? productRefsByName[group.mainProduct.상품명]?.품번 ?? '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
                             수량: {sizeProduct.수량}개
