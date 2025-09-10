@@ -23,6 +23,7 @@ export default function Home() {
   const [groupedData, setGroupedData] = useState<GroupedProductData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [productRefsByName, setProductRefsByName] = useState<Record<string, { 품번?: string; 품목코드?: string }>>({});
+  const [totalPaidAmount, setTotalPaidAmount] = useState(0);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -31,6 +32,8 @@ export default function Home() {
     setIsLoading(true);
     try {
       const data = await readExcelFile(file);
+      const totalPaid = data.reduce((sum, item) => sum + (item.매출금액 || 0), 0);
+      setTotalPaidAmount(totalPaid);
       const aggregatedData = aggregateDataByProduct(data);
       const grouped = groupProductsBySize(aggregatedData);
       setGroupedData(grouped);
@@ -199,6 +202,9 @@ export default function Home() {
     return new Intl.NumberFormat('ko-KR').format(amount);
   };
 
+  const totalSaleAmount = groupedData.reduce((sum, group) => sum + group.mainProduct.매출금액, 0);
+  const pointUsageAmount = totalSaleAmount - totalPaidAmount;
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -283,7 +289,7 @@ export default function Home() {
                       총 수량
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      총 매출금액
+                      판매 금액
                     </th>
                   </tr>
                 </thead>
@@ -342,23 +348,29 @@ export default function Home() {
             </div>
             
             {/* 요약 정보 */}
-            <div className="bg-gray-50 px-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-gray-50 px-6 py-8">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-md">
                 <div>
-                  <span className="text-gray-500">총 상품 수:</span>
-                  <span className="ml-2 font-semibold">{groupedData.length}개</span>
+                  <span className="text-gray-500 ">총 상품 수:</span>
+                  <span className="ml-2 font-semibold ">{groupedData.length}개</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">총 수량:</span>
-                  <span className="ml-2 font-semibold">
+                  <span className="text-gray-500 ">총 수량:</span>
+                  <span className="ml-2 font-semibold ">
                     {groupedData.reduce((sum, group) => sum + group.mainProduct.수량, 0).toLocaleString()}개
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-500">총 매출:</span>
-                  <span className="ml-2 font-semibold text-green-600">
-                    ₩{formatCurrency(groupedData.reduce((sum, group) => sum + group.mainProduct.매출금액, 0))}
-                  </span>
+                  <span className="text-gray-500  ">판매 금액:</span>
+                  <span className="ml-2 font-semibold ">₩{formatCurrency(totalSaleAmount)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 ">포인트 사용 금액:</span>
+                  <span className="ml-2 font-semibold  text-blue-600 ">₩{formatCurrency(pointUsageAmount)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 ">총매출:</span>
+                  <span className="ml-2 font-semibold text-green-600 ">₩{formatCurrency(totalPaidAmount)}</span>
                 </div>
               </div>
             </div>
