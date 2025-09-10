@@ -122,35 +122,36 @@ export default function Home() {
 
   const groupProductsBySize = (data: ProductData[]): GroupedProductData[] => {
     const mainProducts: { [key: string]: ProductData } = {};
-    const sizeProducts: { [key: string]: ProductData[] } = {};
+    const mainProductsByNorm: { [key: string]: ProductData } = {};
+    const sizeProductsByNormBase: { [key: string]: ProductData[] } = {};
+    const socksSizeItems: ProductData[] = [];
+
+    const normalizeName = (name: string) => name
+      .toLowerCase()
+      .replace(/[\s_\-\/]/g, '')
+      .trim();
     
     data.forEach(item => {
-      if (item.상품명.includes('_')) {
-        // 사이즈 상품인 경우
-        // 메인 상품을 찾기 위해 모든 메인 상품과 비교
-        let matchedMainProduct = null;
-        for (const mainProductName in mainProducts) {
-          if (item.상품명.includes(mainProductName)) {
-            matchedMainProduct = mainProductName;
-            break;
+      const isSize = item.상품명.includes('_');
+      const isSock = item.상품명.includes('양말');
+      if (isSize) {
+        if (isSock) {
+          // 양말 예외: 나중에 메인명 포함 매칭으로 연결
+          socksSizeItems.push(item);
+        } else {
+          // 일반 규칙: 마지막 '_' 앞의 베이스 이름을 사용하고 정규화하여 매칭
+          const lastIdx = item.상품명.lastIndexOf('_');
+          const baseRaw = lastIdx > 0 ? item.상품명.slice(0, lastIdx).trim() : item.상품명.trim();
+          const baseNorm = normalizeName(baseRaw);
+          if (!sizeProductsByNormBase[baseNorm]) {
+            sizeProductsByNormBase[baseNorm] = [];
           }
-        }
-        
-        if (matchedMainProduct) {
-          if (!sizeProducts[matchedMainProduct]) {
-            sizeProducts[matchedMainProduct] = [];
-          }
-          // 사이즈 상품의 매출금액을 메인 상품의 개별 금액 * 수량으로 계산
-          const mainProduct = mainProducts[matchedMainProduct];
-          const calculatedItem = {
-            ...item,
-            매출금액: (mainProduct.개별금액 || 0) * item.수량
-          };
-          sizeProducts[matchedMainProduct].push(calculatedItem);
+          sizeProductsByNormBase[baseNorm].push(item);
         }
       } else {
         // 메인 상품인 경우
         mainProducts[item.상품명] = item;
+        mainProductsByNorm[normalizeName(item.상품명)] = item;
       }
     });
     
@@ -160,9 +161,17 @@ export default function Home() {
     const sortedMainProducts = Object.values(mainProducts).sort((a, b) => b.매출금액 - a.매출금액);
     
     sortedMainProducts.forEach(mainProduct => {
-      const sizeList = sizeProducts[mainProduct.상품명] || [];
-      // 사이즈 상품들을 수량 순으로 정렬
-      const sortedSizeProducts = sizeList.sort((a, b) => b.수량 - a.수량);
+      const isMainSock = mainProduct.상품명.includes('양말');
+      const rawSizeList = isMainSock
+        ? socksSizeItems.filter((sp) => sp.상품명.includes(mainProduct.상품명))
+        : (sizeProductsByNormBase[normalizeName(mainProduct.상품명)] || []);
+      // 메인 상품의 개별 금액으로 사이즈 상품 매출 재계산 후 수량 순 정렬
+      const calculatedSizeProducts = rawSizeList
+        .map((sizeProduct) => ({
+          ...sizeProduct,
+          매출금액: (mainProduct.개별금액 || 0) * sizeProduct.수량
+        }))
+        .sort((a, b) => b.수량 - a.수량);
       
       // 쇼핑백 상품들의 개별 금액 설정
       let individualPrice = mainProduct.개별금액 || 0;
@@ -182,7 +191,7 @@ export default function Home() {
         };
       } else {
         // 다른 메인 상품은 사이즈 상품들의 매출 합계
-        const totalSizeRevenue = sortedSizeProducts.reduce((sum, sizeProduct) => sum + sizeProduct.매출금액, 0);
+        const totalSizeRevenue = calculatedSizeProducts.reduce((sum, sizeProduct) => sum + sizeProduct.매출금액, 0);
         recalculatedMainProduct = {
           ...mainProduct,
           매출금액: totalSizeRevenue
@@ -191,7 +200,7 @@ export default function Home() {
       
       result.push({
         mainProduct: recalculatedMainProduct,
-        sizeProducts: sortedSizeProducts
+        sizeProducts: calculatedSizeProducts
       });
     });
     
