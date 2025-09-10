@@ -89,7 +89,7 @@ export default function Home() {
             상품명: String(row["개별상품 명"] || row["상품명"] || "").trim(),
             수량: Number(row["개별상품 개수"] || row["수량"] || 0),
             매출금액: Number(row["결제금액"] || row["매출금액(배송비포함)"] || 0),
-            개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0)
+            개별금액: Number(row["주문금액"] || row["상품 개별 금액"] || 0)
           })).filter(item => item.상품명 && item.상품명.trim() !== "");
           
           resolve(processedData);
