@@ -405,10 +405,7 @@ export default function Home() {
                     {groupedData.reduce((sum, group) => sum + group.mainProduct.수량, 0).toLocaleString()}개
                   </span>
                 </div>
-                <div>
-                  <span className="text-gray-500  ">판매 금액:</span>
-                  <span className="ml-2 font-semibold ">₩{formatCurrency(totalSaleAmount)}</span>
-                </div>
+ 
                 <div>
                   <span className="text-gray-500 ">포인트 사용 금액:</span>
                   <span className="ml-2 font-semibold  text-blue-600 ">₩{formatCurrency(pointUsageAmount)}</span>
