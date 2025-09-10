@@ -8,6 +8,7 @@ interface ProductData {
   수량: number;
   매출금액: number;
   개별금액?: number;
+  구매UID?: string;
 }
 
 interface GroupedProductData {
@@ -24,6 +25,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [productRefsByName, setProductRefsByName] = useState<Record<string, { 품번?: string; 품목코드?: string }>>({});
   const [totalPaidAmount, setTotalPaidAmount] = useState(0);
+  const [bagPointAdjustment, setBagPointAdjustment] = useState(0);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -34,7 +36,9 @@ export default function Home() {
       const data = await readExcelFile(file);
       const totalPaid = data.reduce((sum, item) => sum + (item.매출금액 || 0), 0);
       setTotalPaidAmount(totalPaid);
-      const aggregatedData = aggregateDataByProduct(data);
+      const { rows: adjustedRows, bagPointAdjustment: bagAdj } = adjustQuantitiesByUidMismatch(data);
+      setBagPointAdjustment(bagAdj);
+      const aggregatedData = aggregateDataByProduct(adjustedRows);
       const grouped = groupProductsBySize(aggregatedData);
       setGroupedData(grouped);
     } catch (error) {
@@ -92,7 +96,8 @@ export default function Home() {
             상품명: String(row["개별상품 명"] || row["상품명"] || "").trim(),
             수량: Number(row["개별상품 개수"] || row["수량"] || 0),
             매출금액: Number(row["결제금액"] || row["매출금액(배송비포함)"] || 0),
-            개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0)
+            개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0),
+            구매UID: String((row["구매UID"] ?? row["구매 UID"] ?? row["주문번호"] ?? "")).trim() || undefined
           })).filter(item => item.상품명 && item.상품명.trim() !== "");
           
           resolve(processedData);
@@ -103,6 +108,37 @@ export default function Home() {
       reader.onerror = reject;
       reader.readAsArrayBuffer(file);
     });
+  };
+
+  const adjustQuantitiesByUidMismatch = (rows: ProductData[]): { rows: ProductData[]; bagPointAdjustment: number } => {
+    const groups: Record<string, ProductData[]> = {};
+    rows.forEach((item) => {
+      const uid = (item.구매UID || "").toString().trim();
+      if (!uid) return;
+      if (!groups[uid]) groups[uid] = [];
+      groups[uid].push(item);
+    });
+
+    let adjustment = 0;
+    Object.values(groups).forEach((items) => {
+      const sumIndividual = items.reduce((sum, it) => sum + (Number(it.개별금액 || 0) * Number(it.수량 || 0)), 0);
+      const groupPaid = items.reduce((paid, it) => {
+        const v = Number(it.매출금액 || 0);
+        return v > 0 ? paid + v : paid;
+      }, 0);
+
+      if (sumIndividual !== groupPaid) {
+        items.forEach((it) => {
+          if (it.상품명 === "쇼핑백 중") {
+            adjustment += 100 * Number(it.수량 || 0);
+          } else if (it.상품명 === "쇼핑백 대") {
+            adjustment += 200 * Number(it.수량 || 0);
+          }
+        });
+      }
+    });
+
+    return { rows, bagPointAdjustment: adjustment };
   };
 
   const aggregateDataByProduct = (data: ProductData[]): ProductData[] => {
@@ -212,7 +248,7 @@ export default function Home() {
   };
 
   const totalSaleAmount = groupedData.reduce((sum, group) => sum + group.mainProduct.매출금액, 0);
-  const pointUsageAmount = totalSaleAmount - totalPaidAmount;
+  const pointUsageAmount = totalSaleAmount - totalPaidAmount + bagPointAdjustment;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
