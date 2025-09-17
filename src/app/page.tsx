@@ -26,6 +26,8 @@ export default function Home() {
   const [productRefsByName, setProductRefsByName] = useState<Record<string, { 품번?: string; 품목코드?: string }>>({});
   const [totalPaidAmount, setTotalPaidAmount] = useState(0);
   const [bagPointAdjustment, setBagPointAdjustment] = useState(0);
+  const [stockByName, setStockByName] = useState<Record<string, number>>({});
+  const [stockLoadedCount, setStockLoadedCount] = useState(0);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -101,6 +103,38 @@ export default function Home() {
           })).filter(item => item.상품명 && item.상품명.trim() !== "");
           
           resolve(processedData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const readStockExcelFile = (file: File): Promise<Record<string, number>> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
+
+          const map: Record<string, number> = {};
+          jsonData.forEach((row: ExcelRow) => {
+            const nameRaw = (row["상품이름"] ?? row["상품명"] ?? row["제품명"] ?? row["개별상품 명"]) as string | number | undefined;
+            const qtyRaw = (row["판매금지 나이제한"] ?? row["재고 수량"] ?? row["재고"] ?? row["수량"]) as string | number | undefined;
+            const name = String(nameRaw ?? "").trim();
+            const qty = Number(qtyRaw ?? 0);
+            if (name) {
+              map[name] = qty;
+            }
+          });
+
+          resolve(map);
         } catch (error) {
           reject(error);
         }
@@ -250,6 +284,27 @@ export default function Home() {
   const totalSaleAmount = groupedData.reduce((sum, group) => sum + group.mainProduct.매출금액, 0);
   const pointUsageAmount = totalSaleAmount - totalPaidAmount + bagPointAdjustment;
 
+  const handleStockFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (groupedData.length === 0) {
+      alert("먼저 매출 엑셀 파일을 업로드 해주세요.");
+      event.currentTarget.value = "";
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const map = await readStockExcelFile(file);
+      setStockByName(map);
+      setStockLoadedCount(Object.keys(map).length);
+    } catch (error) {
+      console.error("재고 파일 처리 중 오류가 발생했습니다:", error);
+      alert("재고 파일 처리 중 오류가 발생했습니다. 파일 형식을 확인해주세요.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -289,6 +344,28 @@ export default function Home() {
               <p className="text-xs text-gray-400 mt-1">
                 매출현황 -{'>'}  매출내역 -{'>'} 엑셀다운로드(정산자료)의 파일을 업로드 해주세요.
               </p>
+
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <p className="text-sm text-gray-600 mb-3">재고 수량 파일 업로드 (매출 파일 업로드 후)</p>
+                <label
+                  htmlFor="stock-file-upload"
+                  className={`cursor-pointer ${groupedData.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-medium py-2 px-4 rounded-md transition-colors`}
+                >
+                  재고 엑셀 선택
+                </label>
+                <input
+                  id="stock-file-upload"
+                  name="stock-file-upload"
+                  type="file"
+                  className="sr-only"
+                  accept=".xlsx,.xls"
+                  onChange={handleStockFileUpload}
+                  disabled={groupedData.length === 0}
+                />
+                {stockLoadedCount > 0 && (
+                  <p className="mt-2 text-xs text-gray-500">불러온 재고 품목: {stockLoadedCount}개</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -331,7 +408,10 @@ export default function Home() {
                      품번
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      총 수량
+                      판매 수량
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      재고 수량
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       판매 금액
@@ -360,6 +440,9 @@ export default function Home() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
                           {group.mainProduct.수량.toLocaleString()}개
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
+                          {/* {stockByName[group.mainProduct.상품명] !== undefined ? `${stockByName[group.mainProduct.상품명].toLocaleString()}개` : '-'} */}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                           ₩{formatCurrency(group.mainProduct.매출금액)}
                         </td>
@@ -379,7 +462,10 @@ export default function Home() {
                           {productRefsByName[sizeProduct.상품명]?.품번 ?? productRefsByName[group.mainProduct.상품명]?.품번 ?? '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
-                            수량: {sizeProduct.수량}개
+                            판매: {sizeProduct.수량}개
+                          </td>
+                          <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
+                            {stockByName[sizeProduct.상품명] !== undefined ? `재고: ${stockByName[sizeProduct.상품명]}개` : '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
                             ₩{formatCurrency(sizeProduct.매출금액)}
