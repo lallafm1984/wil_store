@@ -70,8 +70,6 @@ function extractProductNamesFromSheet(workbook: XLSX.WorkBook): string[] {
 }
 
 export default function ExcelComparePage() {
-  const [leftFile, setLeftFile] = useState<File | null>(null);
-  const [rightFile, setRightFile] = useState<File | null>(null);
   const [leftData, setLeftData] = useState<ParsedSheet | null>(null);
   const [rightData, setRightData] = useState<ParsedSheet | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +85,6 @@ export default function ExcelComparePage() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       setError(null);
       const file = e.target.files?.[0] || null;
-      setLeftFile(file);
       if (!file) {
         setLeftData(null);
         return;
@@ -95,7 +92,7 @@ export default function ExcelComparePage() {
       try {
         const parsed = await handleFile(file);
         setLeftData(parsed);
-      } catch (err) {
+      } catch {
         setError("좌측 파일 파싱 중 오류가 발생했습니다.");
       }
     },
@@ -106,7 +103,6 @@ export default function ExcelComparePage() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       setError(null);
       const file = e.target.files?.[0] || null;
-      setRightFile(file);
       if (!file) {
         setRightData(null);
         return;
@@ -114,7 +110,7 @@ export default function ExcelComparePage() {
       try {
         const parsed = await handleFile(file);
         setRightData(parsed);
-      } catch (err) {
+      } catch {
         setError("우측 파일 파싱 중 오류가 발생했습니다.");
       }
     },
@@ -150,7 +146,7 @@ export default function ExcelComparePage() {
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-2xl font-semibold mb-4">엑셀 상품명 비교</h1>
       <p className="text-sm text-gray-600 mb-6">
-        두 엑셀 파일의 첫 번째 시트에서 "상품이름/상품명" 열을 추출해 존재 여부를 비교합니다.
+        두 엑셀 파일의 첫 번째 시트에서 &quot;상품이름/상품명&quot; 열을 추출해 존재 여부를 비교합니다.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
