@@ -36,3 +36,9 @@ body {
 .table-scroll::-webkit-scrollbar-track {
   background-color: rgba(148, 163, 184, 0.2);
 }
+
+/* 항상 가로 스크롤 공간을 유지하여 스크롤바가 사라지지 않게 */
+.table-scroll {
+  scrollbar-gutter: stable both-edges;
+  overflow-x: scroll; /* 강제 표시 */
+}

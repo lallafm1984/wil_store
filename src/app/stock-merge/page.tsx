@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 type RowObject = Record<string, unknown>;
@@ -213,6 +213,75 @@ export default function StockMergePage() {
   const [mapping, setMapping] = useState<MappingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewEnabled] = useState(false);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const isSyncingRef = useRef(false);
+  const [phantomWidth, setPhantomWidth] = useState<number>(0);
+  const [colWidths, setColWidths] = useState<number[]>([]);
+
+  // 고정할 컬럼 인덱스 계산: 상품명 계열 열만 고정 (첫 열 고정 롤백)
+  const stickyIndex = useMemo(() => {
+    if (!base || !base.headers.length) return undefined as number | undefined;
+    const nameSynonyms = ["상품명", "상품이름", "제품명", "name", "product", "title"];
+    const norm = (s: string) => s.replace(/\s+/g, " ").replace(/[\r\n\t]+/g, " ").trim().toLowerCase();
+    const normalizedToIndex = new Map<string, number>();
+    base.headers.forEach((h, i) => normalizedToIndex.set(norm(h), i));
+    for (const cand of nameSynonyms) {
+      const idx = normalizedToIndex.get(norm(cand));
+      if (typeof idx === "number") return idx;
+    }
+    return undefined;
+  }, [base]);
+
+  const recalcPhantomWidth = useCallback(() => {
+    const tableWidth = tableRef.current?.scrollWidth ?? 0;
+    const containerWidth = bottomScrollRef.current?.clientWidth ?? 0;
+    // 컨테이너보다 조금 더 넓게 설정하여 스크롤바가 항상 조작 가능
+    const width = Math.max(tableWidth, containerWidth + 1);
+    setPhantomWidth(width);
+  }, []);
+
+  // 헤더 컬럼 너비 측정 후 sticky left 오프셋 계산을 위해 저장
+  const measureColumnWidths = useCallback(() => {
+    const ths = tableRef.current?.querySelectorAll("thead th");
+    if (!ths || ths.length === 0) return;
+    const widths: number[] = Array.from(ths).map((el) => (el as HTMLElement).offsetWidth || 0);
+    setColWidths(widths);
+  }, []);
+
+  useEffect(() => {
+    recalcPhantomWidth();
+    measureColumnWidths();
+  }, [recalcPhantomWidth, measureColumnWidths, base, src, mapping]);
+
+  useEffect(() => {
+    const onResize = () => recalcPhantomWidth();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [recalcPhantomWidth]);
+
+  // sticky 컬럼들의 left 오프셋 계산
+  const stickyLeftByIndex = useMemo(() => {
+    if (!colWidths.length || stickyIndex === undefined) return {} as Record<number, number>;
+    return { [stickyIndex]: 0 } as Record<number, number>;
+  }, [colWidths, stickyIndex]);
+
+  const onTopScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    const left = (e.currentTarget as HTMLDivElement).scrollLeft;
+    if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
+    isSyncingRef.current = false;
+  }, []);
+
+  const onBottomScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    const left = (e.currentTarget as HTMLDivElement).scrollLeft;
+    if (topScrollRef.current) topScrollRef.current.scrollLeft = left;
+    isSyncingRef.current = false;
+  }, []);
  
 
   const onChangeBase = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,24 +414,52 @@ export default function StockMergePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="border rounded-lg p-4">
           <h2 className="font-medium mb-2">첫번째 파일 (기준)</h2>
-          <input type="file" accept=".xlsx,.xls,.csv" onChange={onChangeBase} className="block w-full text-sm" />
+          <div className="flex items-center gap-3">
+            <input id="base-file" type="file" accept=".xlsx,.xls,.csv" onChange={onChangeBase} className="sr-only" />
+            <label
+              htmlFor="base-file"
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded text-sm font-medium cursor-pointer transition-colors ${
+                base ? "bg-green-600 hover:bg-green-500 text-white" : "bg-blue-600 hover:bg-blue-500 text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {base ? "다시 선택" : "파일 선택"}
+            </label>
+           
+            <span className="text-xs text-gray-500">(.xlsx, .xls, .csv)</span>
+          </div>
           {base && (
             <div className="mt-3 text-sm text-gray-700">
-              <div>파일명: {base.filename}</div>
-              <div>행 수: {base.rows.length}</div>
-              <div>열 수: {base.headers.length}</div>
+              <div className="truncate"><span className="text-gray-500">파일명:</span> {base.filename}</div>
+              <div className="text-gray-500">행 수: <span className="text-gray-800">{base.rows.length}</span> · 열 수: <span className="text-gray-800">{base.headers.length}</span></div>
             </div>
           )}
         </div>
 
         <div className="border rounded-lg p-4">
           <h2 className="font-medium mb-2">두번째 파일 (덮을 데이터)</h2>
-          <input type="file" accept=".xlsx,.xls,.csv" onChange={onChangeSrc} className="block w-full text-sm" />
+          <div className="flex items-center gap-3">
+            <input id="overlay-file" type="file" accept=".xlsx,.xls,.csv" onChange={onChangeSrc} className="sr-only" />
+            <label
+              htmlFor="overlay-file"
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded text-sm font-medium cursor-pointer transition-colors ${
+                src ? "bg-green-600 hover:bg-green-500 text-white" : "bg-purple-600 hover:bg-purple-500 text-white"
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {src ? "다시 선택" : "파일 선택"}
+            </label>
+             
+            <span className="text-xs text-gray-500">(.xlsx, .xls, .csv)</span>
+          </div>
           {src && (
             <div className="mt-3 text-sm text-gray-700">
-              <div>파일명: {src.filename}</div>
-              <div>행 수: {src.rows.length}</div>
-              <div>열 수: {src.headers.length}</div>
+              <div className="truncate"><span className="text-gray-500">파일명:</span> {src.filename}</div>
+              <div className="text-gray-500">행 수: <span className="text-gray-800">{src.rows.length}</span> · 열 수: <span className="text-gray-800">{src.headers.length}</span></div>
             </div>
           )}
         </div>
@@ -393,25 +490,52 @@ export default function StockMergePage() {
 
       {/* 테이블 렌더링: 첫번째 파일의 헤더 순서 유지 */}
       {base && (
-        <div className="table-scroll border rounded-lg overflow-auto">
-          <table className="min-w-max text-xs">
+        <>
+          {/* 상단 가로 스크롤바 */}
+          <div ref={topScrollRef} onScroll={onTopScroll} className="table-scroll border rounded-lg w-full overflow-x-scroll overflow-y-hidden mb-2">
+            <div style={{ width: phantomWidth, height: 1 }} />
+          </div>
+
+          {/* 본문 테이블 (하단 스크롤 동작) */}
+          <div ref={bottomScrollRef} onScroll={onBottomScroll} className="table-scroll border rounded-lg w-full overflow-x-scroll overflow-y-auto">
+            <table ref={tableRef} className="min-w-max text-xs">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                {base.headers.map((h) => (
-                  <th key={h} className="text-left px-2 py-1 border-b border-gray-200 whitespace-nowrap">{h}</th>
-                ))}
+                {base.headers.map((h, colIdx) => {
+                  const isSticky = stickyLeftByIndex[colIdx] !== undefined;
+                  const style = isSticky
+                    ? { position: "sticky" as const, left: stickyLeftByIndex[colIdx], zIndex: 5, background: "#f9fafb" }
+                    : undefined;
+                  return (
+                    <th
+                      key={h}
+                      style={style}
+                      className="text-left px-2 py-1 border-b border-gray-200 whitespace-nowrap bg-gray-50"
+                    >
+                      {h}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {(merged ? merged.rows : base.rows).map((row, idx) => (
                 <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                  {base.headers.map((h) => {
+                  {base.headers.map((h, colIdx) => {
                     const value = row[h as keyof RowObject] as unknown as string;
                     const changedFlag = (row[`__changed__${h}` as keyof RowObject] as boolean | undefined) === true;
                     const prevValue = row[`__prev__${h}` as keyof RowObject] as unknown as string | undefined;
                     const cellClass = changedFlag ? "bg-yellow-100" : "";
+                    const isSticky = stickyLeftByIndex[colIdx] !== undefined;
+                    const style = isSticky
+                      ? { position: "sticky" as const, left: stickyLeftByIndex[colIdx], zIndex: 3, background: "inherit" }
+                      : undefined;
                     return (
-                      <td key={h} className={`px-2 py-1 border-b border-gray-100 align-top whitespace-nowrap ${cellClass}`}>
+                      <td
+                        key={h}
+                        style={style}
+                        className={`px-2 py-1 border-b border-gray-100 align-top whitespace-nowrap ${cellClass}`}
+                      >
                         {changedFlag && !previewEnabled && prevValue !== undefined ? (
                           <span>
                             <span className="text-gray-400">{String(prevValue)}</span>
@@ -427,8 +551,9 @@ export default function StockMergePage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
