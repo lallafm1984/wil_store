@@ -126,8 +126,8 @@ export default function Home() {
           const map: Record<string, { qty?: number; location?: string }> = {};
           jsonData.forEach((row: ExcelRow) => {
             const nameRaw = (row["상품이름"] ?? row["상품명"] ?? row["제품명"] ?? row["개별상품 명"]) as string | number | undefined;
-            const qtyRaw = (row["판매금지 나이제한"] ?? row["재고 수량"] ?? row["재고"] ?? row["수량"]) as string | number | undefined;
-            const locationRaw = (row["재고수량 관리여부"] ?? row["매장 진열 위치"] ?? row["진열 위치"] ?? row["진열위치"]) as string | number | undefined;
+            const qtyRaw = (row["재고수량"] ?? row["재고 수량"] ?? row["재고"] ?? row["수량"]) as string | number | undefined;
+            const locationRaw = (row["상품 매장 진열 위치"] ?? row["매장 진열 위치"] ?? row["진열 위치"] ?? row["진열위치"]) as string | number | undefined;
             const name = String(nameRaw ?? "").trim();
             const qty = Number(qtyRaw ?? 0);
             const location = String(locationRaw ?? "").trim();
