@@ -26,7 +26,7 @@ export default function Home() {
   const [productRefsByName, setProductRefsByName] = useState<Record<string, { 품번?: string; 품목코드?: string }>>({});
   const [totalPaidAmount, setTotalPaidAmount] = useState(0);
   const [bagPointAdjustment, setBagPointAdjustment] = useState(0);
-  const [stockByName, setStockByName] = useState<Record<string, number>>({});
+  const [stockByName, setStockByName] = useState<Record<string, { qty?: number; location?: string }>>({});
   const [stockLoadedCount, setStockLoadedCount] = useState(0);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +112,7 @@ export default function Home() {
     });
   };
 
-  const readStockExcelFile = (file: File): Promise<Record<string, number>> => {
+  const readStockExcelFile = (file: File): Promise<Record<string, { qty?: number; location?: string }>> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -123,14 +123,16 @@ export default function Home() {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
 
-          const map: Record<string, number> = {};
+          const map: Record<string, { qty?: number; location?: string }> = {};
           jsonData.forEach((row: ExcelRow) => {
             const nameRaw = (row["상품이름"] ?? row["상품명"] ?? row["제품명"] ?? row["개별상품 명"]) as string | number | undefined;
             const qtyRaw = (row["판매금지 나이제한"] ?? row["재고 수량"] ?? row["재고"] ?? row["수량"]) as string | number | undefined;
+            const locationRaw = (row["재고수량 관리여부"] ?? row["매장 진열 위치"] ?? row["진열 위치"] ?? row["진열위치"]) as string | number | undefined;
             const name = String(nameRaw ?? "").trim();
             const qty = Number(qtyRaw ?? 0);
+            const location = String(locationRaw ?? "").trim();
             if (name) {
-              map[name] = qty;
+              map[name] = { qty, location: location || undefined };
             }
           });
 
@@ -413,6 +415,9 @@ export default function Home() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       재고 수량
                     </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    진열 위치
+                  </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       판매 금액
                     </th>
@@ -441,7 +446,10 @@ export default function Home() {
                           {group.mainProduct.수량.toLocaleString()}개
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
-                          {/* {stockByName[group.mainProduct.상품명] !== undefined ? `${stockByName[group.mainProduct.상품명].toLocaleString()}개` : '-'} */}
+                          {stockByName[group.mainProduct.상품명]?.qty !== undefined ? `${stockByName[group.mainProduct.상품명]?.qty?.toLocaleString()}개` : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {stockByName[group.mainProduct.상품명]?.location ?? '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                           ₩{formatCurrency(group.mainProduct.매출금액)}
@@ -465,7 +473,10 @@ export default function Home() {
                             판매: {sizeProduct.수량}개
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
-                            {stockByName[sizeProduct.상품명] !== undefined ? `재고: ${stockByName[sizeProduct.상품명]}개` : '-'}
+                            {stockByName[sizeProduct.상품명]?.qty !== undefined ? `${stockByName[sizeProduct.상품명]?.qty?.toLocaleString()}개` : '-'}
+                          </td>
+                          <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
+                            {stockByName[sizeProduct.상품명]?.location ?? '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
                             ₩{formatCurrency(sizeProduct.매출금액)}
