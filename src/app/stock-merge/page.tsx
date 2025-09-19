@@ -212,7 +212,7 @@ export default function StockMergePage() {
   const [src, setSrc] = useState<ParsedSheet | null>(null);
   const [mapping, setMapping] = useState<MappingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [previewEnabled] = useState(false);
  
 
   const onChangeBase = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,7 +223,7 @@ export default function StockMergePage() {
       const parsed = await parseFile(file);
       setBase(parsed);
       if (src) setMapping(computeMappings(parsed.headers, src.headers));
-    } catch (err) {
+    } catch {
       setError("첫번째 파일(기준) 파싱 중 오류가 발생했습니다.");
     }
   }, [src]);
@@ -236,7 +236,7 @@ export default function StockMergePage() {
       const parsed = await parseFile(file);
       setSrc(parsed);
       if (base) setMapping(computeMappings(base.headers, parsed.headers));
-    } catch (err) {
+    } catch {
       setError("두번째 파일(덮을 데이터) 파싱 중 오류가 발생했습니다.");
     }
   }, [base]);
@@ -263,23 +263,23 @@ export default function StockMergePage() {
       const cloned: RowObject = { ...row };
 
       // 업체별로 소스 키 결정
-      const vendorKey = (info as any).baseVendorKey as string | undefined;
+      const vendorKey = info.baseVendorKey;
       const vendorRaw = vendorKey ? row[vendorKey as keyof RowObject] : undefined;
       const vendor = normalizeString(vendorRaw as unknown as string);
       const isNonhyeon = vendor === normalizeString("라페어 논현점");
       const isSinnonhyeon = vendor === normalizeString("라페어 신논현점");
 
       const chosenQtyKey = isNonhyeon
-        ? (info as any).srcQtyKeyNonhyeon || (info as any).srcQtyKey || (info as any).srcQtyKeySinnonhyeon
+        ? info.srcQtyKeyNonhyeon || info.srcQtyKey || info.srcQtyKeySinnonhyeon
         : isSinnonhyeon
-        ? (info as any).srcQtyKeySinnonhyeon || (info as any).srcQtyKey
-        : (info as any).srcQtyKey || (info as any).srcQtyKeySinnonhyeon || (info as any).srcQtyKeyNonhyeon;
+        ? info.srcQtyKeySinnonhyeon || info.srcQtyKey
+        : info.srcQtyKey || info.srcQtyKeySinnonhyeon || info.srcQtyKeyNonhyeon;
 
       const chosenLocKey = isNonhyeon
-        ? (info as any).srcLocKeyNonhyeon || (info as any).srcLocKey || (info as any).srcLocKeySinnonhyeon
+        ? info.srcLocKeyNonhyeon || info.srcLocKey || info.srcLocKeySinnonhyeon
         : isSinnonhyeon
-        ? (info as any).srcLocKeySinnonhyeon || (info as any).srcLocKey
-        : (info as any).srcLocKey || (info as any).srcLocKeySinnonhyeon || (info as any).srcLocKeyNonhyeon;
+        ? info.srcLocKeySinnonhyeon || info.srcLocKey
+        : info.srcLocKey || info.srcLocKeySinnonhyeon || info.srcLocKeyNonhyeon;
 
       // 재고수량
       if (baseQtyKey && chosenQtyKey) {
@@ -287,8 +287,8 @@ export default function StockMergePage() {
         const incoming = srcRow[chosenQtyKey as keyof RowObject];
         if (incoming !== undefined && incoming !== null && valuesAreDifferent(current, incoming)) {
           cloned[baseQtyKey] = incoming;
-          (cloned as any)[`__changed__${baseQtyKey}`] = true;
-          (cloned as any)[`__prev__${baseQtyKey}`] = current;
+          cloned[`__changed__${baseQtyKey}`] = true;
+          cloned[`__prev__${baseQtyKey}`] = current;
           changedCells += 1;
           rowChanged = true;
         }
@@ -300,8 +300,8 @@ export default function StockMergePage() {
         const incoming = srcRow[chosenLocKey as keyof RowObject];
         if (incoming !== undefined && incoming !== null && valuesAreDifferent(current, incoming)) {
           cloned[baseLocKey] = incoming;
-          (cloned as any)[`__changed__${baseLocKey}`] = true;
-          (cloned as any)[`__prev__${baseLocKey}`] = current;
+          cloned[`__changed__${baseLocKey}`] = true;
+          cloned[`__prev__${baseLocKey}`] = current;
           changedCells += 1;
           rowChanged = true;
         }
@@ -321,7 +321,9 @@ export default function StockMergePage() {
     const cleaned = dataRows.map((r) => {
       const c: RowObject = {};
       Object.keys(r).forEach((k) => {
-        if (!k.startsWith("__changed__")) c[k] = (r as any)[k];
+        if (!k.startsWith("__changed__") && !k.startsWith("__prev__")) {
+          c[k] = r[k as keyof RowObject];
+        }
       });
       return c;
     });
@@ -336,8 +338,8 @@ export default function StockMergePage() {
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-semibold mb-4">재고 덮어쓰기 (신논현 기준)</h1>
       <p className="text-sm text-gray-600 mb-6">
-        첫번째 파일 형식을 그대로 보여주고, 두번째 파일의 "신논현재고"와 "진열위치 (신논현)"를
-        각각 "재고수량", "상품 매장 진열 위치"에 덮어씁니다. 변경된 셀은 색상으로 표시됩니다.
+        첫번째 파일 형식을 그대로 보여주고, 두번째 파일의 &quot;신논현재고&quot;와 &quot;진열위치 (신논현)&quot;를
+        각각 &quot;재고수량&quot;, &quot;상품 매장 진열 위치&quot;에 덮어씁니다. 변경된 셀은 색상으로 표시됩니다.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -405,8 +407,8 @@ export default function StockMergePage() {
                 <tr key={idx} className="odd:bg-white even:bg-gray-50">
                   {base.headers.map((h) => {
                     const value = row[h as keyof RowObject] as unknown as string;
-                    const changedFlag = (row as any)[`__changed__${h}`] === true;
-                    const prevValue = (row as any)[`__prev__${h}`] as unknown as string | undefined;
+                    const changedFlag = (row[`__changed__${h}` as keyof RowObject] as boolean | undefined) === true;
+                    const prevValue = row[`__prev__${h}` as keyof RowObject] as unknown as string | undefined;
                     const cellClass = changedFlag ? "bg-yellow-100" : "";
                     return (
                       <td key={h} className={`px-2 py-1 border-b border-gray-100 align-top whitespace-nowrap ${cellClass}`}>
