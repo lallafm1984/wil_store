@@ -443,10 +443,10 @@ export default function Home() {
                        
                         
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
-                          {group.mainProduct.수량.toLocaleString()}개
+                          {group.mainProduct.수량.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
-                          {stockByName[group.mainProduct.상품명]?.qty !== undefined ? `${stockByName[group.mainProduct.상품명]?.qty?.toLocaleString()}개` : '-'}
+                          {stockByName[group.mainProduct.상품명]?.qty !== undefined ? `${stockByName[group.mainProduct.상품명]?.qty?.toLocaleString()}` : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {stockByName[group.mainProduct.상품명]?.location ?? '-'}
@@ -470,10 +470,10 @@ export default function Home() {
                           {productRefsByName[sizeProduct.상품명]?.품번 ?? productRefsByName[group.mainProduct.상품명]?.품번 ?? '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
-                            판매: {sizeProduct.수량}개
+                            {sizeProduct.수량}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
-                            {stockByName[sizeProduct.상품명]?.qty !== undefined ? `${stockByName[sizeProduct.상품명]?.qty?.toLocaleString()}개` : '-'}
+                            {stockByName[sizeProduct.상품명]?.qty !== undefined ? `${stockByName[sizeProduct.상품명]?.qty?.toLocaleString()}` : '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
                             {stockByName[sizeProduct.상품명]?.location ?? '-'}
