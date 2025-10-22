@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
 interface ProductData {
@@ -9,6 +9,9 @@ interface ProductData {
   매출금액: number;
   개별금액?: number;
   구매UID?: string;
+  결제일시?: string; // YYYY-MM-DD
+  구매월?: string; // YYYY-MM
+  구매일?: string; // YYYY-MM-DD
 }
 
 interface GroupedProductData {
@@ -28,6 +31,46 @@ export default function Home() {
   const [bagPointAdjustment, setBagPointAdjustment] = useState(0);
   const [stockByName, setStockByName] = useState<Record<string, { qty?: number; location?: string }>>({});
   const [stockLoadedCount, setStockLoadedCount] = useState(0);
+  const [allRows, setAllRows] = useState<ProductData[]>([]);
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string>('ALL');
+
+  const recomputeForScope = (rows: ProductData[]) => {
+    const totalPaid = rows.reduce((sum, item) => sum + (item.매출금액 || 0), 0);
+    const { bagPointAdjustment: bagAdj } = adjustQuantitiesByUidMismatch(rows);
+    setTotalPaidAmount(totalPaid);
+    setBagPointAdjustment(bagAdj);
+    const aggregatedData = aggregateDataByProduct(rows);
+    const grouped = groupProductsBySize(aggregatedData);
+    setGroupedData(grouped);
+  };
+
+  // 일자별 재고 가산 계산: 선택한 구매일 이전까지의 판매 수량을 재고에 가산
+  const adjustedStockByName = useMemo(() => {
+    // 기본: 업로드된 재고 수량 그대로
+    if (!stockByName || Object.keys(stockByName).length === 0) return stockByName;
+    if (!selectedDay || selectedDay === 'ALL') return stockByName;
+
+    // 구매일별 원본 rows에서 선택일 이후 판매 수량 합산
+    // 예시 요구사항에 맞추어: 선택일보다 이후 날짜의 판매 수량은 재고에 아직 반영되지 않았다고 보고 재고에 더함
+    const laterSaleCountByName: Record<string, number> = {};
+    allRows.forEach((row) => {
+      if (!row.구매일) return;
+      if (row.구매일 > selectedDay) {
+        laterSaleCountByName[row.상품명] = (laterSaleCountByName[row.상품명] || 0) + Number(row.수량 || 0);
+      }
+    });
+
+    const adjusted: Record<string, { qty?: number; location?: string }> = {};
+    Object.entries(stockByName).forEach(([name, info]) => {
+      const add = laterSaleCountByName[name] || 0;
+      adjusted[name] = {
+        qty: (info.qty ?? undefined) !== undefined ? (Number(info.qty) + add) : undefined,
+        location: info.location,
+      };
+    });
+    return adjusted;
+  }, [stockByName, allRows, selectedDay]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -36,13 +79,13 @@ export default function Home() {
     setIsLoading(true);
     try {
       const data = await readExcelFile(file);
-      const totalPaid = data.reduce((sum, item) => sum + (item.매출금액 || 0), 0);
-      setTotalPaidAmount(totalPaid);
-      const { rows: adjustedRows, bagPointAdjustment: bagAdj } = adjustQuantitiesByUidMismatch(data);
-      setBagPointAdjustment(bagAdj);
-      const aggregatedData = aggregateDataByProduct(adjustedRows);
-      const grouped = groupProductsBySize(aggregatedData);
-      setGroupedData(grouped);
+      setAllRows(data);
+      const daySet = new Set<string>();
+      data.forEach((r) => { if (r.구매일) daySet.add(r.구매일); });
+      const days = Array.from(daySet).sort();
+      setAvailableDays(days);
+      setSelectedDay('ALL');
+      recomputeForScope(data);
     } catch (error) {
       console.error("파일 처리 중 오류가 발생했습니다:", error);
       alert("파일 처리 중 오류가 발생했습니다. 파일 형식을 확인해주세요.");
@@ -83,6 +126,67 @@ export default function Home() {
     return map;
   };
 
+  // 결제일시 값을 YYYY-MM-DD로 표준화
+  const toDateKey = (raw: string | number | undefined): string | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === 'number') {
+      const parser: any = (XLSX as any)?.SSF?.parse_date_code;
+      if (typeof parser === 'function') {
+        const d = parser(raw);
+        if (d && d.y && d.m && d.d) {
+          const y = d.y;
+          const m = String(d.m).padStart(2, '0');
+          const day = String(d.d).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        }
+      }
+      return undefined;
+    }
+    const s = String(raw).trim();
+    if (!s) return undefined;
+    const m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (m) {
+      const y = m[1];
+      const mo = m[2].padStart(2, '0');
+      const da = m[3].padStart(2, '0');
+      return `${y}-${mo}-${da}`;
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${y}-${mo}-${da}`;
+    }
+    return undefined;
+  };
+
+  // 구매일시(yyyymmddhhmmss)에서 YYYY-MM 추출
+  const toMonthKeyFromPurchase = (raw: string | number | undefined): string | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    let s = typeof raw === 'number' ? String(Math.trunc(raw)) : String(raw).trim();
+    // 숫자만 남기기
+    s = s.replace(/[^0-9]/g, '');
+    if (s.length < 6) return undefined;
+    const yyyy = s.slice(0, 4);
+    const mm = s.slice(4, 6);
+    if (!/^[0-9]{4}$/.test(yyyy) || !/^(0[1-9]|1[0-2])$/.test(mm)) return undefined;
+    return `${yyyy}-${mm}`;
+  };
+
+  // 구매일시(yyyymmddhhmmss)에서 YYYY-MM-DD 추출
+  const toDayKeyFromPurchase = (raw: string | number | undefined): string | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    let s = typeof raw === 'number' ? String(Math.trunc(raw)) : String(raw).trim();
+    s = s.replace(/[^0-9]/g, '');
+    if (s.length < 8) return undefined;
+    const yyyy = s.slice(0, 4);
+    const mm = s.slice(4, 6);
+    const dd = s.slice(6, 8);
+    if (!/^[0-9]{4}$/.test(yyyy) || !/^(0[1-9]|1[0-2])$/.test(mm) || !/^(0[1-9]|[12][0-9]|3[01])$/.test(dd)) return undefined;
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const readExcelFile = (file: File): Promise<ProductData[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -94,13 +198,20 @@ export default function Home() {
           const worksheet = workbook.Sheets[sheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet) as ExcelRow[];
           
-          const processedData = jsonData.map((row: ExcelRow) => ({
-            상품명: String(row["개별상품 명"] || row["상품명"] || "").trim(),
-            수량: Number(row["개별상품 개수"] || row["수량"] || 0),
-            매출금액: Number(row["결제금액"] || row["매출금액(배송비포함)"] || 0),
-            개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0),
-            구매UID: String((row["구매UID"] ?? row["구매 UID"] ?? row["주문번호"] ?? "")).trim() || undefined
-          })).filter(item => item.상품명 && item.상품명.trim() !== "");
+          const processedData = jsonData.map((row: ExcelRow) => {
+            const paymentRaw = (row["결제일시"] ?? row["결제 일시"] ?? row["결제일"] ?? row["결제시간"] ?? row["결제 시간"]) as string | number | undefined;
+            const purchaseRaw = (row["구매일시"] ?? row["구매 일시"]) as string | number | undefined;
+            return {
+              상품명: String(row["개별상품 명"] || row["상품명"] || "").trim(),
+              수량: Number(row["개별상품 개수"] || row["수량"] || 0),
+              매출금액: Number(row["결제금액"] || row["매출금액(배송비포함)"] || 0),
+              개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0),
+              구매UID: String((row["구매UID"] ?? row["구매 UID"] ?? row["주문번호"] ?? "")).trim() || undefined,
+              결제일시: toDateKey(paymentRaw),
+              구매월: toMonthKeyFromPurchase(purchaseRaw),
+              구매일: toDayKeyFromPurchase(purchaseRaw),
+            } as ProductData;
+          }).filter(item => item.상품명 && item.상품명.trim() !== "");
           
           resolve(processedData);
         } catch (error) {
@@ -307,6 +418,13 @@ export default function Home() {
     }
   };
 
+  const handleDayChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    setSelectedDay(value);
+    const rowsInScope = value === 'ALL' ? allRows : allRows.filter((r) => r.구매일 === value);
+    recomputeForScope(rowsInScope);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -346,6 +464,8 @@ export default function Home() {
               <p className="text-xs text-gray-400 mt-1">
                 매출현황 -{'>'}  매출내역 -{'>'} 엑셀다운로드(정산자료)의 파일을 업로드 해주세요.
               </p>
+
+              {/* 월 선택 UI는 제거, 일자 선택은 타이틀 우측으로 이동 */}
 
               <div className="mt-8 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-600 mb-3">재고 수량 파일 업로드 (매출 파일 업로드 후)</p>
@@ -388,10 +508,26 @@ export default function Home() {
         {/* 결과 표시 */}
         {groupedData.length > 0 && (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">
                 상품별 매출 ({groupedData.length}개 상품)
               </h2>
+              {availableDays.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="day-filter" className="text-sm text-gray-600">구매일 선택:</label>
+                  <select
+                    id="day-filter"
+                    className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+                    value={selectedDay}
+                    onChange={handleDayChange}
+                  >
+                    <option value="ALL">전체</option>
+                    {availableDays.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -446,7 +582,7 @@ export default function Home() {
                           {group.mainProduct.수량.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 ">
-                          {stockByName[group.mainProduct.상품명]?.qty !== undefined ? `${stockByName[group.mainProduct.상품명]?.qty?.toLocaleString()}` : '-'}
+                          {adjustedStockByName[group.mainProduct.상품명]?.qty !== undefined ? `${adjustedStockByName[group.mainProduct.상품명]?.qty?.toLocaleString()}` : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {stockByName[group.mainProduct.상품명]?.location ?? '-'}
@@ -473,7 +609,7 @@ export default function Home() {
                             {sizeProduct.수량}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
-                            {stockByName[sizeProduct.상품명]?.qty !== undefined ? `${stockByName[sizeProduct.상품명]?.qty?.toLocaleString()}` : '-'}
+                            {adjustedStockByName[sizeProduct.상품명]?.qty !== undefined ? `${adjustedStockByName[sizeProduct.상품명]?.qty?.toLocaleString()}` : '-'}
                           </td>
                           <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-600">
                             {stockByName[sizeProduct.상품명]?.location ?? '-'}
