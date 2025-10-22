@@ -126,19 +126,25 @@ export default function Home() {
     return map;
   };
 
+  type XlsxDate = { y?: number; m?: number; d?: number };
+
+  const safeParseXlsxDate = (value: number): XlsxDate | undefined => {
+    const ssf = (XLSX as unknown as { SSF?: { parse_date_code?: (v: number) => XlsxDate } }).SSF;
+    const fn = ssf?.parse_date_code;
+    if (typeof fn !== 'function') return undefined;
+    return fn(value);
+  };
+
   // 결제일시 값을 YYYY-MM-DD로 표준화
   const toDateKey = (raw: string | number | undefined): string | undefined => {
     if (raw === undefined || raw === null) return undefined;
     if (typeof raw === 'number') {
-      const parser: any = (XLSX as any)?.SSF?.parse_date_code;
-      if (typeof parser === 'function') {
-        const d = parser(raw);
-        if (d && d.y && d.m && d.d) {
-          const y = d.y;
-          const m = String(d.m).padStart(2, '0');
-          const day = String(d.d).padStart(2, '0');
-          return `${y}-${m}-${day}`;
-        }
+      const d = safeParseXlsxDate(raw);
+      if (d && d.y && d.m && d.d) {
+        const y = d.y;
+        const m = String(d.m).padStart(2, '0');
+        const day = String(d.d).padStart(2, '0');
+        return `${y}-${m}-${day}`;
       }
       return undefined;
     }
