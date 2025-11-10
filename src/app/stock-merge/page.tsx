@@ -124,7 +124,7 @@ function computeMappings(baseHeaders: string[], srcHeaders: string[]): MappingIn
       "매장명",
     ]) || undefined;
 
-  const srcQtyKey =
+  let srcQtyKey =
     findHeaderBySynonyms(srcHeaders, [
       "신논현재고",
       "신논 현재고",
@@ -132,7 +132,7 @@ function computeMappings(baseHeaders: string[], srcHeaders: string[]): MappingIn
       "신논현 현재고",
       "현재고 신논현",
     ]) || undefined;
-  const srcLocKey =
+  let srcLocKey =
     findHeaderBySynonyms(srcHeaders, [
       "진열위치 (신논현)",
       "진열위치(신논현)",
@@ -176,6 +176,16 @@ function computeMappings(baseHeaders: string[], srcHeaders: string[]): MappingIn
       "논현 진열 위치",
       "논현 위치",
     ]) || undefined;
+
+  // 동일 형식 허용: 두번째 파일이 첫번째와 같은 헤더명을 사용하는 경우 매핑
+  if (!srcQtyKey && baseQtyKey) {
+    const sameAsBaseQty = findHeaderBySynonyms(srcHeaders, [baseQtyKey]);
+    if (sameAsBaseQty) srcQtyKey = sameAsBaseQty;
+  }
+  if (!srcLocKey && baseLocKey) {
+    const sameAsBaseLoc = findHeaderBySynonyms(srcHeaders, [baseLocKey]);
+    if (sameAsBaseLoc) srcLocKey = sameAsBaseLoc;
+  }
 
   const joinKey = detectJoinKey(baseHeaders, srcHeaders);
 
@@ -405,11 +415,8 @@ export default function StockMergePage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">재고 덮어쓰기 (신논현 기준)</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        첫번째 파일 형식을 그대로 보여주고, 두번째 파일의 &quot;신논현재고&quot;와 &quot;진열위치 (신논현)&quot;를
-        각각 &quot;재고수량&quot;, &quot;상품 매장 진열 위치&quot;에 덮어씁니다. 변경된 셀은 색상으로 표시됩니다.
-      </p>
+      <h1 className="text-2xl font-semibold mb-4">재고 덮어쓰기 </h1>
+      
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="border rounded-lg p-4">
