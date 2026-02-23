@@ -207,17 +207,21 @@ export default function Home() {
           const processedData = jsonData.map((row: ExcelRow) => {
             const paymentRaw = (row["결제일시"] ?? row["결제 일시"] ?? row["결제일"] ?? row["결제시간"] ?? row["결제 시간"]) as string | number | undefined;
             const purchaseRaw = (row["구매일시"] ?? row["구매 일시"]) as string | number | undefined;
+            const isCancelled = String(row["취소여부"] || row["취소 여부"] || "").trim().toUpperCase() === "Y";
+            
+            if (isCancelled) return null;
+
             return {
               상품명: String(row["개별상품 명"] || row["상품명"] || "").trim(),
               수량: Number(row["개별상품 개수"] || row["수량"] || 0),
               매출금액: Number(row["결제금액"] || row["매출금액(배송비포함)"] || 0),
-              개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] || 0),
+              개별금액: Number(row["개별상품 금액"] || row["상품 개별 금액"] ||  0),
               구매UID: String((row["구매UID"] ?? row["구매 UID"] ?? row["주문번호"] ?? "")).trim() || undefined,
               결제일시: toDateKey(paymentRaw),
               구매월: toMonthKeyFromPurchase(purchaseRaw),
               구매일: toDayKeyFromPurchase(purchaseRaw),
             } as ProductData;
-          }).filter(item => item.상품명 && item.상품명.trim() !== "");
+          }).filter((item): item is ProductData => item !== null && item.상품명 !== undefined && item.상품명.trim() !== "");
           
           resolve(processedData);
         } catch (error) {
@@ -383,7 +387,7 @@ export default function Home() {
         const totalSizeRevenue = calculatedSizeProducts.reduce((sum, sizeProduct) => sum + sizeProduct.매출금액, 0);
         recalculatedMainProduct = {
           ...mainProduct,
-          매출금액: totalSizeRevenue
+          매출금액: totalSizeRevenue > 0 ? totalSizeRevenue : mainProduct.매출금액
         };
       }
       
