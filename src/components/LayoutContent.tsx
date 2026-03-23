@@ -24,7 +24,7 @@ function LayoutContentInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex">
       <Sidebar />
-      <main className={`flex-1 min-h-screen bg-gray-50 transition-all duration-300 ${
+      <main className={`flex-1 min-h-screen min-w-0 bg-gray-50 transition-all duration-300 ${
         collapsed ? 'ml-16' : 'ml-64'
       }`}>
         {children}
