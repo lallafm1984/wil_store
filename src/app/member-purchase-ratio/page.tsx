@@ -384,9 +384,6 @@ export default function MemberPurchaseRatioPage() {
             <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-100">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">매장별 회원 구매 비율</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  매장당 구매 건수(동일 주문번호는 1건, 주문번호 없음은 행당 1건)
-                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
