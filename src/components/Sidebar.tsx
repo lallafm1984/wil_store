@@ -24,16 +24,6 @@ const menuItems: MenuItem[] = [
     description: '무인매장 매출 엑셀 변환'
   },
   {
-    name: '정산결과 검토',
-    href: '/settlement-review',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v2h6v-2M12 3v12m0 0l3-3m-3 3l-3-3" />
-      </svg>
-    ),
-    description: '두 엑셀 비교'
-  },
-  {
     name: '재고 덮어쓰기',
     href: '/stock-merge',
     icon: (

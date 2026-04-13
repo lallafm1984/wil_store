@@ -1,0 +1,143 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776047237100,
+  "projectRoot": "C:\\Users\\Lim\\Desktop\\HomePage\\wil-store\\wil-store",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "15.5.12",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.1.0",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.1.0",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "next lint"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 6,
+      "lastAccessed": 1776047237072,
+      "keyFiles": [
+        "file.svg",
+        "globe.svg",
+        "next.svg",
+        "vercel.svg",
+        "window.svg"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1776047237072,
+      "keyFiles": []
+    },
+    "src\\app": {
+      "path": "src\\app",
+      "purpose": "Application code",
+      "fileCount": 4,
+      "lastAccessed": 1776047237082,
+      "keyFiles": [
+        "favicon.ico",
+        "globals.css",
+        "layout.tsx"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 2,
+      "lastAccessed": 1776047237082,
+      "keyFiles": [
+        "LayoutContent.tsx",
+        "Sidebar.tsx"
+      ]
+    },
+    "src\\lib": {
+      "path": "src\\lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1776047237083,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src\\app\\member-purchase-ratio\\page.tsx",
+      "accessCount": 35,
+      "lastAccessed": 1776048744839,
+      "type": "file"
+    },
+    {
+      "path": "src\\app\\page.tsx",
+      "accessCount": 24,
+      "lastAccessed": 1776051769082,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\Sidebar.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1776048757546,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

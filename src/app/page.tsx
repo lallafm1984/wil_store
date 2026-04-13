@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 
 interface ProductData {
@@ -428,6 +428,48 @@ export default function Home() {
     }
   };
 
+  const handleResultsCopy = useCallback((e: React.ClipboardEvent) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const selText = selection.toString();
+    if (!selText.includes('총 상품 수') && !selText.includes('실제 매출')) return;
+
+    e.preventDefault();
+
+    const range = selection.getRangeAt(0);
+    const fragment = range.cloneContents();
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(fragment);
+
+    // 요약 div 제거 (화면용 중복 방지)
+    const summaryEl = tempDiv.querySelector('[data-summary]');
+    if (summaryEl) summaryEl.remove();
+
+    const totalQty = groupedData.reduce((sum, g) => sum + g.mainProduct.수량, 0);
+
+    // 요약을 별도 테이블로 추가 (빈 A열 + B열에 값)
+    const summaryTableHtml = '<table>'
+      + `<tr><td></td><td>총 상품 수: ${groupedData.length}개</td></tr>`
+      + `<tr><td></td><td>총 수량: ${totalQty.toLocaleString()}개</td></tr>`
+      + `<tr><td></td><td>매출금액: ₩${formatCurrency(totalPaidAmount + pointUsageAmount)}</td></tr>`
+      + `<tr><td></td><td>포인트 사용 금액: ₩${formatCurrency(pointUsageAmount)}</td></tr>`
+      + `<tr><td></td><td>실제 매출: ₩${formatCurrency(totalPaidAmount)}</td></tr>`
+      + '</table>';
+
+    const html = tempDiv.innerHTML + summaryTableHtml;
+
+    const plainSummary = '\n'
+      + `총 상품 수: ${groupedData.length}개\n`
+      + `총 수량: ${totalQty.toLocaleString()}개\n`
+      + `매출금액: ₩${formatCurrency(totalPaidAmount + pointUsageAmount)}\n`
+      + `포인트 사용 금액: ₩${formatCurrency(pointUsageAmount)}\n`
+      + `실제 매출: ₩${formatCurrency(totalPaidAmount)}`;
+
+    e.clipboardData.setData('text/html', html);
+    e.clipboardData.setData('text/plain', (tempDiv.textContent || '') + plainSummary);
+  }, [groupedData, totalPaidAmount, pointUsageAmount, formatCurrency]);
+
   const handleDayChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
     setSelectedDay(value);
@@ -517,7 +559,7 @@ export default function Home() {
 
         {/* 결과 표시 */}
         {groupedData.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden" onCopy={handleResultsCopy}>
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">
                 상품별 매출 ({groupedData.length}개 상품)
@@ -634,37 +676,32 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            
+
             {/* 요약 정보 */}
-            <div className="bg-gray-50 px-6 py-8">
+            <div className="bg-gray-50 px-6 py-8" data-summary>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-md">
                 <div>
-                  <span className="text-gray-500 ">총 상품 수:</span>
-                  <span className="ml-2 font-semibold ">{groupedData.length}개</span>
+                  <span className="text-gray-500">총 상품 수:</span>
+                  <span className="ml-2 font-semibold">{groupedData.length}개</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 ">총 수량:</span>
-                  <span className="ml-2 font-semibold ">
+                  <span className="text-gray-500">총 수량:</span>
+                  <span className="ml-2 font-semibold">
                     {groupedData.reduce((sum, group) => sum + group.mainProduct.수량, 0).toLocaleString()}개
                   </span>
                 </div>
-                {/* <div>
-                  <span className="text-gray-500  ">판매 금액:</span>
-                  <span className="ml-2 font-semibold ">₩{formatCurrency(totalSaleAmount)}</span>
-                </div> */}
-                 <div>
-                  <span className="text-gray-500 ">매출금액:</span>
-                  <span className="ml-2 font-semibold text-green-600 ">₩{formatCurrency(totalPaidAmount+pointUsageAmount)}</span>
+                <div>
+                  <span className="text-gray-500">매출금액:</span>
+                  <span className="ml-2 font-semibold text-green-600">₩{formatCurrency(totalPaidAmount+pointUsageAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 ">포인트 사용 금액:</span>
-                  <span className="ml-2 font-semibold  text-blue-600 ">₩{formatCurrency(pointUsageAmount)}</span>
+                  <span className="text-gray-500">포인트 사용 금액:</span>
+                  <span className="ml-2 font-semibold text-blue-600">₩{formatCurrency(pointUsageAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 ">실제 매출:</span>
-                  <span className="ml-2 font-semibold text-red-600 ">₩{formatCurrency(totalPaidAmount)}</span>
+                  <span className="text-gray-500">실제 매출:</span>
+                  <span className="ml-2 font-semibold text-red-600">₩{formatCurrency(totalPaidAmount)}</span>
                 </div>
-                
               </div>
             </div>
           </div>
